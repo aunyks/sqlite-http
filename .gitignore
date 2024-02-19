@@ -1,0 +1,8 @@
+/target
+minio-data
+*-litestream
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3

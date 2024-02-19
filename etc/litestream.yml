@@ -1,0 +1,17 @@
+exec: cargo run -- --host 127.0.0.1:8080 --db-path ./example.db
+dbs:
+  - path: /Users/aunyks/dev/sqlite-http/example.db
+    replicas:
+      - name: S3 Backup
+        type: s3
+        region: us-east-1
+        access-key-id: minioadmin
+        secret-access-key: minioadmin
+        bucket: test-bucket
+        endpoint: http://127.0.0.1:9000
+        path: path/subpath/example.db
+        skip-verify: true
+logging:
+  level: info
+  type: text
+  stderr: false
