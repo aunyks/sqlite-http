@@ -6,3 +6,5 @@ minio-data
 *.db-wal
 *.sqlite
 *.sqlite3
+*.tmp-shm
+*.tmp-wal
