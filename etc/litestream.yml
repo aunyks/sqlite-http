@@ -1,4 +1,4 @@
-exec: cargo run -- --host 127.0.0.1:8080 --db-path ./example.db
+exec: sqlite-http --host 127.0.0.1:8080 --db-path ./example.db
 dbs:
   - path: /Users/aunyks/dev/sqlite-http/example.db
     replicas:
