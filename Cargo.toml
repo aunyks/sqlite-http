@@ -2,6 +2,8 @@
 name = "sqlite-http"
 version = "0.1.0"
 edition = "2021"
+description = "An HTTP interface for SQLite."
+license = "Unlicensed"
 
 [profile.release]
 lto = true
