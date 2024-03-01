@@ -1,6 +1,6 @@
 [package]
 name = "sqlite-http"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "An HTTP interface for SQLite."
 license = "MIT"
@@ -17,3 +17,4 @@ tokio = { version = "1.36.0", features = ["full"] }
 clap = { version = "4.5.1", features = ["derive"] }
 log = "0.4.20"
 env_logger = "0.11.2"
+chrono = "0.4.34"

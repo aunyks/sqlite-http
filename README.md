@@ -33,3 +33,14 @@ Restore with litestream (existing config assumes a running local MinIO instance)
 ```sh
 litestream restore -config ./etc/litestream.yml -replica "S3 Backup" ./example.db
 ```
+
+## Collecting Metadata
+
+Using the `--collect-metadata` flag creates a `__metadata_query` table that may be useful in debugging and performance monitoring. Its schema is as follows.
+
+| Column      | Type    |
+| ----------- | ------- |
+| id          | INTEGER |
+| payload     | TEXT    |
+| started_at  | TEXT    |
+| finished_at | TEXT    |
