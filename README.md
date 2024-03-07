@@ -9,7 +9,7 @@ cargo install sqlite-http
 ```
 
 ```sh
-> sqlite-http
+> sqlite-http --help
 An HTTP interface for SQLite.
 
 Usage: sqlite-http [OPTIONS] --host <HOST> --db-path <DB_PATH>
@@ -22,11 +22,11 @@ Options:
       --collect-metadata
           Enable metadata collection about incoming queries
       --disable-wal-mode
-          Disable Write-Ahead-Logging mode
+          Disable Write-Ahead-Logging mode. Enabled by default
       --disable-foreign-keys
-          Don't enforce foreign key constraints
+          Don't enforce foreign key constraints. Enforced by default
       --load-extension <LOAD_EXTENSION>
-          Load an extension from the provided path. This flag can be used multiple times in one invocation
+          Load an extension from the provided path. This flag can be used multiple times in one invocation to load multiple extensions
   -h, --help
           Print help
   -V, --version
