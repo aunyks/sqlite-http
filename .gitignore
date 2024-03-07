@@ -8,3 +8,4 @@ minio-data
 *.sqlite3
 *.tmp-shm
 *.tmp-wal
+/extensions

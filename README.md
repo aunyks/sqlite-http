@@ -8,6 +8,31 @@ An HTTP interface for SQLite. Plays very nicely with [Litestream](https://litest
 cargo install sqlite-http
 ```
 
+```sh
+> sqlite-http
+An HTTP interface for SQLite.
+
+Usage: sqlite-http [OPTIONS] --host <HOST> --db-path <DB_PATH>
+
+Options:
+      --host <HOST>
+          The host to bind to
+      --db-path <DB_PATH>
+          The path to the database file
+      --collect-metadata
+          Enable metadata collection about incoming queries
+      --disable-wal-mode
+          Disable Write-Ahead-Logging mode
+      --disable-foreign-keys
+          Don't enforce foreign key constraints
+      --load-extension <LOAD_EXTENSION>
+          Load an extension from the provided path. This flag can be used multiple times in one invocation
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+```
+
 ## Examples
 
 Basic

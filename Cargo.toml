@@ -1,6 +1,6 @@
 [package]
 name = "sqlite-http"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 description = "An HTTP interface for SQLite."
 license = "MIT"
@@ -9,7 +9,11 @@ license = "MIT"
 lto = true
 
 [dependencies]
-rusqlite = { version = "0.30.0", features = ["bundled", "serde_json"] }
+rusqlite = { version = "0.30.0", features = [
+    "bundled",
+    "serde_json",
+    "load_extension",
+] }
 warp = "0.3.6"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = "1.0.113"
