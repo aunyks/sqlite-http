@@ -87,8 +87,10 @@ async fn main() {
     }
     let db_conn = db_conn.unwrap();
 
-    if let Err(e) = db_conn.execute_batch("PRAGMA journal_mode=WAL;PRAGMA encoding = \"UTF-8\"") {
-        log::error!("Could not enable WAL mode: {:?}", e);
+    if let Err(e) = db_conn.execute_batch(
+        "PRAGMA journal_mode=WAL;PRAGMA encoding = \"UTF-8\";PRAGMA foreign_keys = ON",
+    ) {
+        log::error!("Could execute prelude statements: {:?}", e);
         panic!();
     }
 
