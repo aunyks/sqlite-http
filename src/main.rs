@@ -1,5 +1,6 @@
 use chrono::Local;
 use clap::Parser;
+use env_logger::{Builder, Env};
 use rusqlite::{
     params_from_iter,
     types::{FromSql, FromSqlResult, ValueRef},
@@ -88,7 +89,12 @@ struct Output {
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    Builder::from_env(
+        Env::default()
+            .filter("SQLITE_HTTP_LOG")
+            .write_style("SQLITE_HTTP_LEVEL"),
+    )
+    .init();
 
     let args = Args::parse();
     log::debug!("Parsed CLI flags: {:?}", &args);
