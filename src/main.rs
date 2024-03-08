@@ -61,14 +61,23 @@ impl From<InteropValue> for Value {
             InteropValue::Blob(v) => Value::String(format!("{:x?}", &v)),
             InteropValue::Integer(i) => Value::Number(Number::from(i)),
             InteropValue::Real(f) => Value::Number(Number::from_f64(f).unwrap()),
-            InteropValue::Text(s) => Value::String(s),
+            InteropValue::Text(s) => {
+                Value::String(s.trim_end_matches('"').trim_start_matches('"').to_owned())
+            }
         }
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum SqlInput {
+    Single(String),
+    Batch(Vec<String>),
+}
+
 #[derive(Serialize, Deserialize)]
 struct Input {
-    sql: String,
+    sql: SqlInput,
     args: Vec<Value>,
 }
 
@@ -145,6 +154,25 @@ async fn main() {
     let r = warp::post().and(warp::body::json()).map(move |input| {
         let Input { sql, args } = &input;
         log::debug!("Received SQL {:?} with args {:?}", sql, args);
+        let mut is_single_statement = false;
+        let mut is_batch_statement = false;
+        match sql {
+            SqlInput::Single(_) => {
+                log::info!("Single statement");
+                is_single_statement = true;
+            }
+            SqlInput::Batch(_) => {
+                log::info!("Batch statements");
+                is_batch_statement = true;
+            }
+            _ => {
+                log::error!("Received mismatched statement and argument types. (single / batch or batch / single)");
+                return warp::reply::with_status(
+                    warp::reply::json(&Output::default()),
+                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                )
+            }
+        }
 
         let db = exclusive_db.lock();
         if let Err(e) = db {
@@ -155,52 +183,111 @@ async fn main() {
             );
         }
         let db = db.unwrap();
+        let mut started_at = Local::now();
+        let mut finished_at = Local::now();
 
-        let prepared_stmt = db.prepare(&sql);
-        if let Err(e) = prepared_stmt {
-            log::error!("Couldn't prepare SQL statement: {}", e);
-            return warp::reply::with_status(
-                warp::reply::json(&Output::default()),
-                warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-            );
-        }
-        let mut prepared_stmt = prepared_stmt.unwrap();
+        if is_single_statement {
+            let sql = match sql{
+                SqlInput::Single(sql_string) => {
+                    sql_string
+                }
+                _ => unreachable!(),
+            };
 
-        let started_at = Local::now();
-        let rows = prepared_stmt.query_map(params_from_iter(args), |row| {
-            let stmt = row.as_ref();
-            let num_columns = stmt.column_count();
-            let mut column_vals: Vec<Value> = Vec::with_capacity(num_columns);
-            for i in 0..num_columns {
-                let column_val = row.get::<usize, InteropValue>(i);
-                if let Err(e) = column_val {
-                    log::warn!("Couldn't convert row column to value: {}", e);
+            let prepared_stmt = db.prepare(&sql);
+            if let Err(e) = prepared_stmt {
+                log::error!("Couldn't prepare SQL statement: {}", e);
+                return warp::reply::with_status(
+                    warp::reply::json(&Output::default()),
+                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                );
+            }
+            let mut prepared_stmt = prepared_stmt.unwrap();
+
+            started_at = Local::now();
+            let rows = prepared_stmt.query_map(params_from_iter(args), |row| {
+                let stmt = row.as_ref();
+                let num_columns = stmt.column_count();
+                let mut column_vals: Vec<Value> = Vec::with_capacity(num_columns);
+                for i in 0..num_columns {
+                    let column_val = row.get::<usize, InteropValue>(i);
+                    if let Err(e) = column_val {
+                        log::warn!("Couldn't convert row column to value: {}", e);
+                        continue;
+                    }
+                    let column_val = column_val.unwrap();
+                    column_vals.push(column_val.into());
+                }
+                Ok(column_vals)
+            });
+            if let Err(e) = rows {
+                log::error!("Query failed: {}", e);
+                return warp::reply::with_status(
+                    warp::reply::json(&Output::default()),
+                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                );
+            }
+            finished_at = Local::now();
+
+            let rows = rows.unwrap();
+            let mut result_rows = Vec::new();
+            for queried_row in rows {
+                let queried_row = queried_row;
+                if let Err(e) = queried_row {
+                    log::error!("Queried row had an error: {}", e);
                     continue;
                 }
-                let column_val = column_val.unwrap();
-                column_vals.push(column_val.into());
+                let queried_row = queried_row.unwrap();
+                result_rows.push(queried_row);
             }
-            Ok(column_vals)
-        });
-        if let Err(e) = rows {
-            log::error!("Query failed: {}", e);
+
             return warp::reply::with_status(
-                warp::reply::json(&Output::default()),
-                warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                warp::reply::json(&Output { rows: result_rows }),
+                warp::http::StatusCode::OK,
             );
         }
-        let finished_at = Local::now();
+        if is_batch_statement {
+            let sqls = match sql {
+                SqlInput::Batch(sql_strings) => {
+                    sql_strings
+                }
+                _ => unreachable!(),
+            };
 
-        let rows = rows.unwrap();
-        let mut result_rows = Vec::new();
-        for queried_row in rows {
-            let queried_row = queried_row;
-            if let Err(e) = queried_row {
-                log::error!("Queried row had an error: {}", e);
-                continue;
+            if sqls.len() != args.len() {
+                log::error!(
+                    "Wasn't provided the same number of sql statements and sets of arguments"
+                );
+                return warp::reply::with_status(
+                    warp::reply::json(&Output::default()),
+                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                );
             }
-            let queried_row = queried_row.unwrap();
-            result_rows.push(queried_row);
+
+            // NOTE: We don't need to begin a transaction here, because we have an
+            // exclusive lock to the DB via our mutex
+            started_at = Local::now();
+            for (stmt_idx, sql_stmt) in sqls.iter().enumerate() {
+                let these_args = match args.get(stmt_idx).unwrap() {
+                    Value::Array(args) => args,
+                    _ => {
+                        log::error!("Did not find arguments array at index {}", stmt_idx);
+                        return warp::reply::with_status(
+                            warp::reply::json(&Output::default()),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        );
+                    }
+                };
+                let stmt_result = db.execute(&sql_stmt, params_from_iter(these_args.iter()));
+                if let Err(e) = stmt_result {
+                    log::error!("Executing statement failed: {}", e);
+                    return warp::reply::with_status(
+                        warp::reply::json(&Output::default()),
+                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    );
+                }
+            }
+            finished_at = Local::now();
         }
 
         if collect_metadata {
@@ -216,10 +303,10 @@ async fn main() {
             }
         }
 
-        warp::reply::with_status(
-            warp::reply::json(&Output { rows: result_rows }),
+        return warp::reply::with_status(
+            warp::reply::json(&Output::default()),
             warp::http::StatusCode::OK,
-        )
+        );
     });
 
     let host = host.parse();

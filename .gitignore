@@ -9,3 +9,4 @@ minio-data
 *.tmp-shm
 *.tmp-wal
 /extensions
+/db
